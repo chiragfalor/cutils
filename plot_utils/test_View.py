@@ -15,6 +15,7 @@ class TestViewOperations(unittest.TestCase):
             x = np.linspace(0, 10, 100)
             y = x
             ax.plot(x, y, label="Linear")
+            ax.axhline(y=0, color='r', linestyle='--',)
 
             return ax
         self.plot1 = Plot(linear_plot, title="Linear Plot", xlabel="X", ylabel="Y", legend=['lin'])
@@ -24,6 +25,7 @@ class TestViewOperations(unittest.TestCase):
             x = np.linspace(0, 10, 100)
             y = np.sin(x)
             ax.plot(x, y)
+            ax.axhline(y=0, color='r', linestyle='--',)
             return ax
         self.plot2 = Plot(sine_plot, title="Sine Plot", xlabel="X", ylabel="Y", legend=['sin'], xlim=(0, 5))
         self.plot2_hash = hash(self.plot2)
@@ -131,6 +133,27 @@ class TestViewOperations(unittest.TestCase):
                                          [5, 5, 5]]).T
         np.testing.assert_array_equal(final_view.arrangement, expected_arrangement)
         self.assertEqual(len(final_view.plots), 5)
+
+
+    def test_sharey(self):
+        view1, view2 = View(self.plot1), View(self.plot2)
+        combined_view = view1 + view2
+        fig, axes = combined_view.plot(sharey=True)
+        yticks1 = axes[0, 0].get_yticks()
+        yticks2 = axes[0, 1].get_yticks()
+        np.testing.assert_array_equal(yticks1, yticks2)
+
+    def test_sharex(self):
+        view1, view2 = View(self.plot1), View(self.plot2)
+        combined_view = view1 / view2
+        fig, axes = combined_view.plot(sharex=True)
+        xticks1 = axes[0, 0].get_xticks()
+        xticks2 = axes[1, 0].get_xticks()
+        np.testing.assert_array_equal(xticks1, xticks2)
+
+    
+
+
 
 if __name__ == '__main__':
     unittest.main()

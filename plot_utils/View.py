@@ -105,7 +105,7 @@ class Plot:
 
 class View:
     def __init__(
-        self, plots: list[Plot] | dict[int, Plot], arrangement: np.ndarray | None = None
+        self, plots: list[Plot] | dict[int, Plot] | Plot, arrangement: np.ndarray | None = None
     ):
         if isinstance(plots, Sequence):
             plots = {hash(plot): plot for plot in plots}
@@ -146,6 +146,12 @@ class View:
             axes_arrangement[self.arrangement == plot_hash] = axes[plot_hash]
 
         return fig, axes_arrangement
+    
+
+    def show(self, **fig_args):
+        fig, axes = self.plot(**fig_args)
+        plt.show()
+
 
     def _calculate_figsize(self) -> tuple[float, float]:
         return (self.arrangement.shape[1] * 4 + 4, self.arrangement.shape[0] * 3 + 2)
@@ -185,8 +191,12 @@ class View:
     @staticmethod
     def _set_share_axes(axs: np.ndarray, axis: str, hide_shared_ticks: bool) -> None:
         target = axs.flat[0]
-        for ax in axs.flat:
-            target._shared_axes[axis].join(target, ax)
+        target.autoscale(enable=True)
+        for ax in axs.flat[1:]:
+            if axis == "x":
+                ax.sharex(target)
+            elif axis == "y":
+                ax.sharey(target)
         if hide_shared_ticks:
             for ax in axs.flat:
                 getattr(ax, f"_label_outer_{axis}axis")(skip_non_rectangular_axes=True)
@@ -245,9 +255,9 @@ class View:
     def _plot_on_same_axes(self, other: 'View') -> 'View':
         # assert there is only one plot in each view
         assert all(len(view.plots) == 1 for view in [self, other])
-        return View(
-            [list(self.plots.values())[0] * list(other.plots.values())[0]],
-        )
+        plot1 = list(self.plots.values())[0]
+        plot2 = list(other.plots.values())[0]
+        return View(plot1 * plot2)
 
     def _repr_html_(self):
         fig, axes = self.plot()
