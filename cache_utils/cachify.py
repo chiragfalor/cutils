@@ -2,14 +2,17 @@ import functools
 import os
 import pickle
 import pathlib
-from typing import Callable
+from typing import Callable, ParamSpec, TypeVar
 
 from .ArgsKwargs import ArgsKwargs
+
+P = ParamSpec('P')
+R = TypeVar('R')
 
 
 class CachifyManager:
     def __init__(self, func: Callable, directory: pathlib.Path):
-        self.func = func
+        self.func: Callable[P, R] = func
         self.directory = directory
         if not os.path.exists(directory):
             os.makedirs(directory)
@@ -38,9 +41,9 @@ class CachifyManager:
         print(f"Updated cache for {self.func.__name__} at file {cache_file}")
         return result
 
-    def get_wrapped_func(self):
+    def get_wrapped_func(self) -> Callable[P, R]:
         @functools.wraps(self.func)
-        def wrapper(*args, **kwargs):
+        def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
             cache_file = self._get_filename(args, kwargs)
 
             try: # Check if the result is already cached
@@ -79,7 +82,7 @@ class CachifyManager:
 def cachify_factory(directory: str | pathlib.Path):
     directory = pathlib.Path(directory)
     def decorator_factory(version=0):
-        def cache_decorator(func):
+        def cache_decorator(func: Callable[P, R]) -> Callable[P, R]:
             # Create the function-specific directory
             version_dir = directory / func.__name__ / f"v{version}"
             cm = CachifyManager(func, version_dir)
