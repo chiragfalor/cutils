@@ -2,6 +2,8 @@ from math import lcm
 import matplotlib.pyplot as plt
 import numpy as np
 
+import joblib # for hashing arrays and dataframes
+
 from dataclasses import field
 from pydantic.dataclasses import dataclass
 
@@ -53,12 +55,12 @@ class Plot:
     def __init__(
         self,
         plot_fn: Callable[[plt.Axes], Any],
-        title=None,
-        xlabel=None,
-        ylabel=None,
-        legend=None,
-        xlim=None,
-        ylim=None,
+        title: str = None,
+        xlabel: str = None,
+        ylabel: str = None,
+        legend: list[str] = None,
+        xlim: tuple[float, float] = None,
+        ylim: tuple[float, float] = None,
         **kwargs,
     ):
         self.plot_fn = plot_fn
@@ -77,12 +79,24 @@ class Plot:
         self.pargs.add_to_axes(ax)
 
     def __hash__(self):
-        # hash the code and name of the plot function
+        # hash the code, name, and closure variables of the plot function
         code_hash = hash(self.plot_fn.__code__)
         name_hash = hash(self.plot_fn.__name__)
         pargs_hash = hash(self.pargs)
+        
+        # Get closure variables if they exist
+        closure_hash = 0
+        if hasattr(self.plot_fn, '__closure__') and self.plot_fn.__closure__:
+            closure_vars = tuple(cell.cell_contents for cell in self.plot_fn.__closure__)
+            # Hash the closure variables which are hashable
+            closure_hash = joblib.hash(closure_vars)
+            
+        # Get global variables used by the function
+        global_vars = {k: v for k, v in self.plot_fn.__globals__.items() 
+                      if k in self.plot_fn.__code__.co_names}
+        globals_hash = joblib.hash(tuple(sorted(global_vars.items())))
 
-        return hash((code_hash, name_hash, pargs_hash))
+        return hash((code_hash, name_hash, pargs_hash, closure_hash, globals_hash))
 
     def __mul__(self, other: "Plot"):
         """Plot them on the same axes"""
