@@ -9,6 +9,11 @@ from pydantic.dataclasses import dataclass
 
 from typing import Callable, Any, Sequence, Optional, Union, Dict
 
+def safe_hash(obj):
+    try:
+        return hash(obj)
+    except TypeError:
+        return hash(joblib.hash(obj))
 
 @dataclass
 class PlotArgs:
@@ -89,12 +94,12 @@ class Plot:
         if hasattr(self.plot_fn, '__closure__') and self.plot_fn.__closure__:
             closure_vars = tuple(cell.cell_contents for cell in self.plot_fn.__closure__)
             # Hash the closure variables which are hashable
-            closure_hash = joblib.hash(closure_vars)
+            closure_hash = safe_hash(closure_vars)
             
         # Get global variables used by the function
         global_vars = {k: v for k, v in self.plot_fn.__globals__.items() 
                       if k in self.plot_fn.__code__.co_names}
-        globals_hash = joblib.hash(tuple(sorted(global_vars.items())))
+        globals_hash = safe_hash(tuple(sorted(global_vars.items())))
 
         return hash((code_hash, name_hash, pargs_hash, closure_hash, globals_hash))
 
