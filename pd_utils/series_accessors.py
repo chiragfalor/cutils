@@ -1,6 +1,6 @@
 import pandas as pd
 import pandas_flavor as pf
-from typing import Union, Any, Sequence
+from typing import Sequence
 import numpy as np
 import warnings
 print("loading series_utils")
@@ -83,7 +83,7 @@ def qtl_clip(s: pd.Series, qtl: float=0.01, *, lower_qtl=None, upper_qtl=None):
     
 
 @pf.register_series_method
-def desc(s: pd.Series, percentiles: Sequence[float]=[0.25, 0.5, 0.75], topk: int=5) -> pd.Series:
+def desc(s: pd.Series, percentiles: Sequence[float]=(0.25, 0.5, 0.75), topk: int=5) -> pd.Series:
     """
     Generates descriptive statistics that summarize the central tendency, dispersion and shape of a dataset's distribution, proportion of NaN values. For categorical data, the function provides the value counts of top_k most frequent values, and the entropy of the distribution.
 
