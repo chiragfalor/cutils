@@ -228,6 +228,25 @@ class WtdDataFrameAccessor:
             columns=numeric_df.columns,
         )
 
+    def beta(self, wts: pd.Series | None = None) -> pd.DataFrame:
+        """
+        Computes the weighted beta for each numeric column.
+        """
+        wts = self.get_wts(wts)
+        numeric_df = self._df.select_dtypes(include=[np.number])
+        mask = ~wts.isnull()
+        X, wts = numeric_df[mask].fillna(0).values, wts[mask].to_numpy()
+        wts = wts / wts.sum()
+        weighted_cov = (wts[:, None] * X).T @ X
+        betas = weighted_cov / weighted_cov.diagonal()
+
+        return pd.DataFrame(
+            betas,
+            index=numeric_df.columns,
+            columns=numeric_df.columns,
+        )
+
+
     def describe(
         self, percentiles: Sequence[float] = [0.25, 0.5, 0.75], wts: pd.Series | None = None
     ) -> pd.DataFrame:

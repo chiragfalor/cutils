@@ -1,4 +1,5 @@
 import pandas as pd
+from pandas.compat.numpy.function import CompatValidator
 import pandas_flavor as pf
 from typing import Sequence
 import numpy as np
@@ -418,13 +419,13 @@ class WtdSeriesAccessor:
         return np.sqrt((self._s**2).wtd.mean(wts)).item()
     
 
-    def corr(self, s2: pd.Series, wts: pd.Series | None=None) -> float:
+    def corr(self, s2: pd.Series | pd.DataFrame, wts: pd.Series | None=None) -> float | pd.Series:
         """
         Calculates the un-demeaned weighted correlation between two input series: <s1 * wts * s2> / sqrt(<s1 * wts * s1> * <s2 * wts * s2>)
 
         Parameters
         ----------
-        s2 : pd.Series
+        s2 : pd.Series | pd.DataFrame
             The second input series for which the weighted correlation is to be calculated.
         wts : pd.Series, optional, default None
             The weights to be used for calculating the weighted correlation. If not specified, the function assumes equal weights for all elements.
@@ -451,11 +452,17 @@ class WtdSeriesAccessor:
         >>> s1 = pd.Series([1, 0, -1, 1], dtype=float)
         >>> s2 = pd.Series([-1, 0, 1, 1], dtype=float)
         >>> s3 = pd.Series([1, 2, 1, 0], dtype=float)
+        >>> df = pd.DataFrame({'s1': s1, 's2': s2, 's3': s3})
         >>> wts = pd.Series([0.3, 0.4, 0.3, 0.0], dtype=float)
         >>> print(f"{s1.wtd.corr(s2, wts):.2f}")
         -1.00
         >>> s3.wtd.corr(s1, wts)
         0.0
+        >>> s1.wtd.corr(df, wts)
+        s1    1.0
+        s2   -1.0
+        s3    0.0
+        dtype: float64
         """
         wts = self.get_wts(wts)
 
@@ -463,11 +470,86 @@ class WtdSeriesAccessor:
             raise ValueError("Length of series must be the same")
 
         
-        mask = ~self._s.isnull() & ~s2.isnull() & ~wts.isnull()
+        mask = ~self._s.isnull() & ~wts.isnull()
         s1, s2, wts = self._s[mask], s2[mask], wts[mask]
+        s2 = s2.fillna(0)
+        assert len(s1) == len(s2) == len(wts)
+        if isinstance(s2, pd.Series):
+            return (s1 * s2).wtd.mean(wts) / (s1.wtd.size(wts) * s2.wtd.size(wts))
+        elif isinstance(s2, pd.DataFrame):
+            wts = wts / wts.sum()
+            s1, wts = s1.values.reshape(-1, 1), wts.values.reshape(-1, 1)
+            cov = (wts * s1 * s2).sum()
+            var1 = (wts * s1**2).sum()
+            var2 = (wts * s2**2).sum()
+            return cov / np.sqrt(var1 * var2)
+
+    def beta(self, s2: pd.Series | pd.DataFrame, wts: pd.Series | None=None) -> float | pd.Series:
+        """
+        Calculates the un-demeaned weighted beta between from s2 to the current series: <s1 * wts * s2> * (s2.T * wts * s2)^(-1)
+
+        Parameters
+        ----------
+        s2 : pd.Series | pd.DataFrame
+            The second input series for which the weighted beta is to be calculated.
+        wts : pd.Series, optional, default None
+            The weights to be used for calculating the weighted beta. If not specified, the function assumes equal weights for all elements.
+
+        Returns
+        -------
+        float
+            The weighted beta from s2 to the current series s1
+
+        Notes
+        -----
+        This function calculates the weighted beta without demeaning the series. 
+        Implicitly, it assumes that E[s1] = E[s2] = 0.
 
 
-        return (s1 * s2).wtd.mean(wts) / (s1.wtd.size(wts) * s2.wtd.size(wts))
+        Examples
+        --------
+        >>> s1 = pd.Series(range(1, 11), dtype=float)
+        >>> s1.wtd.beta(s1) # self beta
+        1.0
+        >>> wts = pd.Series(range(1, 11), dtype=float)
+        >>> s1.wtd.beta(s1, wts)
+        1.0
+        >>> s1 = pd.Series([1, 0, -1, 1], dtype=float)
+        >>> s2 = pd.Series([-1, 0, 1, 1], dtype=float)
+        >>> s3 = pd.Series([1, 2, 1, 0], dtype=float)
+        >>> df = pd.DataFrame({'s1': s1, 's2': s2, 's3': s3})
+        >>> wts = pd.Series([0.3, 0.4, 0.3, 0.0], dtype=float)
+        >>> print(f"{s1.wtd.beta(s2, wts):.2f}")
+        -1.00
+        >>> s3.wtd.beta(s1, wts)
+        0.0
+        >>> s1.wtd.beta(df, wts)
+        s1    0.5
+        s2   -0.5
+        s3    0.0
+        dtype: float64
+        """
+        wts = self.get_wts(wts)
+
+        if len(self._s) != len(s2):
+            raise ValueError("Length of series must be the same")
+
+        mask = ~self._s.isnull() & ~wts.isnull()
+        s1, s2, wts = self._s[mask], s2[mask], wts[mask]
+        assert len(s1) == len(s2) == len(wts)
+        if isinstance(s2, pd.Series):
+            return (s1 * s2).wtd.mean(wts) / (s2.wtd.size(wts)**2)
+        elif isinstance(s2, pd.DataFrame):
+            X, y, wts = s2.fillna(0).values, s1.values, wts.values
+            wts = wts / wts.sum()
+    
+            # Compute weighted least squares estimate: (X'WX)^(-1) X'Wy
+            XtW = X.T * wts[None, :]
+            beta = np.linalg.pinv(XtW @ X) @ XtW @ y
+
+            return pd.Series(beta, index=s2.columns, name=self._s.name)
+    
+
     
 
     def describe(self, wts: pd.Series | None=None, percentiles: Sequence[float]=[0.25, 0.5, 0.75]) -> pd.Series:
