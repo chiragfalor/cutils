@@ -76,12 +76,18 @@ class Plot:
 
         self.pargs = PlotArgs(title, xlabel, ylabel, legend, xlim, ylim, kwargs)
 
+
+    def set_plot_args(self, title, xlabel, ylabel, legend, xlim, ylim, kwargs):
+        self.pargs = PlotArgs(title, xlabel, ylabel, legend, xlim, ylim, kwargs)
+
     def plot(self, ax: plt.Axes | None = None):
         if ax is None:
             ax = plt.gca()
         self.plot_fn(ax=ax)
 
         self.pargs.add_to_axes(ax)
+
+        return ax
 
     def __hash__(self):
         # hash the code, name, and closure variables of the plot function
@@ -120,6 +126,11 @@ class Plot:
 
     def __repr__(self):
         return f"{self.pargs.title}({self.plot_fn.__name__})"
+
+    
+    def _repr_html_(self):
+        ax = self.plot()
+        return ax.get_figure()._repr_html_()
 
 
 class View:

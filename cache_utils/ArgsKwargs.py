@@ -30,6 +30,9 @@ class ArgsKwargs:
         """Format the function arguments into a string suitable for filenames."""
         parts = [hash_fn(arg) for arg in self.args] + [f"{k!r}={hash_fn(v)}" for k, v in self.kwargs.items()]
 
+        if len(parts) == 0:
+            return "empty_args_kwargs"
+
         return "__".join(parts).replace("/", "_").replace("\\", "_")
     
     def __hash__(self):
@@ -37,6 +40,9 @@ class ArgsKwargs:
     
     @classmethod
     def from_repn(cls, repn: str):
+        if (repn == "empty_args_kwargs") or (repn is None) or (len(repn) == 0):
+            return cls((), {})
+
         parts = repn.split("__")
         args = []
         kwargs = {}
